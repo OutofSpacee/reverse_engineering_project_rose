@@ -1,0 +1,102 @@
+---
+title: "analysis"
+output: html_document
+---
+
+```{r Libraries}
+
+library(tidyverse)
+library(lubridate)
+
+```
+
+```{r Load data}
+
+homicide_data <- read_csv("homicide-data.csv")
+
+```
+
+*Need to check the error made in the first question more thoroughly*
+<completed>  
+
+```{r Reproducable #1}
+
+#1) "... nearly a killing each day for the past three years"
+
+#2) "City police made an arrest in 41 percent of homicides in 2014; last year, the rate was just 27 percent, a 14 percentage point drop."
+
+
+#1) Number of homicides per day for three years 
+glimpse(homicide_data)
+
+#Need to clean reported_date col first
+  #Right now it looks like: <dbl> 20100504 for 2010-05-04
+
+cleaned_homicide_data <- homicide_data |>
+  mutate(cleaned_reported_date = ymd(reported_date)) |> #got an error: 2 failed to parse
+  mutate(year = year(cleaned_reported_date)) #creating year col for later
+
+head(cleaned_homicide_data) #checking df
+
+nrow(cleaned_homicide_data) == nrow(homicide_data) #conditional statement to check if all data stayed
+#seems like all the data is fine despite the error 
+
+#with dates cleaned move onto number of homicides per day for three years
+
+cleaned_homicide_data |>
+  group_by(year) |>
+  filter(city == "Baltimore") |>
+  summarise(
+    homicides_by_year = n()
+  ) |>
+  arrange(desc(year))
+
+#the above code collects the found results by the WP:
+  # 2017: 340 homicides
+  # 2016: 320 homicides
+  # 2015: 342 homicides
+#therefore can say "... nearly a killing each day for the past three years" (in Baltimore)
+
+#2) ratio of arrest in 2014 compared to 2017
+
+cleaned_homicide_data |>
+  group_by(disposition) |>
+  summarise(
+    total = n()
+  ) |>
+  arrange(desc(total))
+
+#the above code figures out the different type of dispositions and their totals
+
+#this finds the totals for each year
+total_dispositions <- cleaned_homicide_data |>
+  group_by(year) |>
+  filter(city == "Baltimore") |>
+  summarise(
+    total_dispositions = n()
+  ) |>
+  arrange(desc(year))
+
+total_dispositions
+
+num_arrests <- cleaned_homicide_data |>
+  group_by(year) |>
+  filter(city == "Baltimore", disposition == "Closed by arrest") |>
+  summarise(
+    total_closed_by_arrests = n()
+  ) |>
+  arrange(desc(year))
+
+num_arrests
+
+dispositions_analysis <- merge(total_dispositions, num_arrests, by = "year") |>
+  mutate(percentage = (total_closed_by_arrests / total_dispositions) *100) |>
+  arrange(desc(year))
+
+dispositions_analysis
+
+#the above gets the percentage of total closed dispositions by an arrest in Baltimore
+#as can be seen in the data frame the arrest rate was just over 40 percent but dropped down to 27 percent in 2017
+
+```
+
