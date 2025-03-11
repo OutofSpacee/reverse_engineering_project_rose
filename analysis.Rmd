@@ -85,15 +85,14 @@ num_arrests <- cleaned_homicide_data |>
   summarise(
     total_closed_by_arrests = n()
   ) |>
-  arrange(desc(year))
-
-num_arrests
-
-dispositions_analysis <- merge(total_dispositions, num_arrests, by = "year") |>
+  left_join(
+    total_dispositions,
+    join_by("year")
+    ) |>
   mutate(percentage = (total_closed_by_arrests / total_dispositions) *100) |>
   arrange(desc(year))
 
-dispositions_analysis
+num_arrests
 
 #the above gets the percentage of total closed dispositions by an arrest in Baltimore
 #as can be seen in the data frame the arrest rate was just over 40 percent but dropped down to 27 percent in 2017
