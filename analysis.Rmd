@@ -19,16 +19,16 @@ homicide_data <- read_csv("homicide-data.csv")
 *Need to check the error made in the first question more thoroughly*
 <completed>  
 
-```{r Reproducable #1}
+*1* Reproducible #1: "... nearly a killing each day for the past three years"
 
-#1) "... nearly a killing each day for the past three years"
+Reproduce: Number of homicides per day for three years
 
-#2) "City police made an arrest in 41 percent of homicides in 2014; last year, the rate was just 27 percent, a 14 percentage point drop."
-
-
-#1) Number of homicides per day for three years 
+```{r Looking through data frame}
 glimpse(homicide_data)
+```
+*1.1* Cleaning dates
 
+```{r Cleaning Dates}
 #Need to clean reported_date col first
   #Right now it looks like: <dbl> 20100504 for 2010-05-04
 
@@ -37,10 +37,18 @@ cleaned_homicide_data <- homicide_data |>
   mutate(year = year(cleaned_reported_date)) #creating year col for later
 
 head(cleaned_homicide_data) #checking df
+```
 
-nrow(cleaned_homicide_data) == nrow(homicide_data) #conditional statement to check if all data stayed
-#seems like all the data is fine despite the error 
+```{r Checking new data}
 
+nrow(cleaned_homicide_data) == nrow(homicide_data) 
+  #conditional statement to check if all data stayed
+
+```
+
+*1.2* Num homicides per day for three years
+
+```{r}
 #with dates cleaned move onto number of homicides per day for three years
 
 cleaned_homicide_data |>
@@ -55,20 +63,15 @@ cleaned_homicide_data |>
   # 2017: 340 homicides
   # 2016: 320 homicides
   # 2015: 342 homicides
+
 #therefore can say "... nearly a killing each day for the past three years" (in Baltimore)
+```
 
-#2) ratio of arrest in 2014 compared to 2017
+*2* Reproducible #2: "City police made an arrest in 41 percent of homicides in 2014; last year, the rate was just 27 percent, a 14 percentage point drop."
 
-cleaned_homicide_data |>
-  group_by(disposition) |>
-  summarise(
-    total = n()
-  ) |>
-  arrange(desc(total))
+*2.1* Finds total number of dispositions by year. This will be needed later to find the percentage.
 
-#the above code figures out the different type of dispositions and their totals
-
-#this finds the totals for each year
+```{r}
 total_dispositions <- cleaned_homicide_data |>
   group_by(year) |>
   filter(city == "Baltimore") |>
@@ -78,8 +81,17 @@ total_dispositions <- cleaned_homicide_data |>
   arrange(desc(year))
 
 total_dispositions
+```
 
-num_arrests <- cleaned_homicide_data |>
+*2.2* Finds the total number of "Closed by arrest" dispositions over the years and then calculates the percentage of dispositions closed by arrest over the years.
+
+It shows that "City police made an arrest in 41 percent of homicides in 2014" where in 2017 "last year the rate was just 27 percent." Doing simple subtraction we can find that there was a 14 percentage point drop between these two years. Finding the below statement true. 
+
+"City police made an arrest in 41 percent of homicides in 2014; last year, the rate was just 27 percent, a 14 percentage point drop."
+
+```{r}
+
+baltimore_percent_arrest <- cleaned_homicide_data |>
   group_by(year) |>
   filter(city == "Baltimore", disposition == "Closed by arrest") |>
   summarise(
@@ -92,10 +104,231 @@ num_arrests <- cleaned_homicide_data |>
   mutate(percentage = (total_closed_by_arrests / total_dispositions) *100) |>
   arrange(desc(year))
 
-num_arrests
+baltimore_percent_arrest
 
-#the above gets the percentage of total closed dispositions by an arrest in Baltimore
-#as can be seen in the data frame the arrest rate was just over 40 percent but dropped down to 27 percent in 2017
+```
+
+
+*3* Reproducible #3:
+
+"Of 50 of the nation’s largest cities, Baltimore is one of 34 where police now make homicide arrests less often than in 2014, according to a Washington Post analysis. In Chicago, the homicide arrest rate has dropped 21 percentage points, in Boston it has dropped 12 points and in St. Louis it is down 9."
+
+The data set contains the nations 50 largest citites. 
+
+*3.1* "Baltimore is one of 34 where police now make homicide arrests less often than in 2014" 
+
+First part is getting the one of 34 where police now make homicide arrests less often than in 2014. First step is gettig the total number of dispositions by city and year.
+
+```{r}
+all_total_dispositions <- cleaned_homicide_data |>
+  group_by(city, year) |>
+  summarise(
+    total_dispositions = n()
+  ) |>
+  arrange(desc(year))
+
+all_total_dispositions
+```
+
+*3.2* Next is collecting the number of all homicides closed by arrests by city and year.
+
+```{r}
+all_closed_by_arrest <- cleaned_homicide_data |>
+  filter(disposition == "Closed by arrest") |>
+  group_by(city, year) |>
+  summarise(
+    total_closed_by_arrests = n()
+  )
+
+all_closed_by_arrest
+```
+
+*3.3* Next is combining the two dataframes by city and year in a left join and finding the percentage for that year.
+
+```{r}
+
+combo_dispo_and_arrest <- left_join(all_total_dispositions, all_closed_by_arrest, by = c("city", "year"), keep = TRUE) |>
+  mutate(
+    year = year.x,
+    city = city.x
+  ) |>
+  select(-year.x, -year.y, -city.x, -city.y) |>
+  mutate(
+    total_dispositions = ifelse(is.na(total_dispositions),
+                                0, total_dispositions),
+    total_closed_by_arrests = ifelse(is.na(total_closed_by_arrests),
+                                     0, total_closed_by_arrests),
+    percentage = (total_closed_by_arrests / total_dispositions) * 100
+    ) |>
+  arrange(desc(city))
+
+combo_dispo_and_arrest
+
+```
+
+*3.4* Isolating 2014 and 2017 from the rest of the data frames.
+
+```{r}
+percent_14 <- combo_dispo_and_arrest |>
+  filter(year == 2014)
+
+percent_14
+
+percent_17 <- combo_dispo_and_arrest |>
+  filter(year == 2017)
+
+percent_17
+```
+
+*3.5* Combining the two year data frames and finding the difference between 2017 - 2014.
+
+```{r}
+diff_14_17 <- left_join(percent_14, percent_17, by = "city", keep = TRUE) |>
+  mutate(percent_difference = percentage.y - percentage.x,
+         city = city.x,
+         `2014_percent_arrested` = percentage.x,
+         `2017_percent_arrested` = percentage.y) |>
+  select(-year.x, -year.y, -city.x, -city.y, -percentage.x, -percentage.y, -total_dispositions.x, -total_dispositions.y, -total_closed_by_arrests.x, -total_closed_by_arrests.y )
+
+diff_14_17
+```
+
+*3.6* Counting the number of rows that contain a percent difference < 0 to find the number of cities where the police made arrests less often than in 2017.
+
+The below count reads back 35 cites instead of the quotes 34 because Durham was counted as having a loss of 63% of arrest rates. Durham can be taken out since there was no rate for city in 2017, therefore the total number of cities that experienced a drop in arrest rates was 34, just like what the WP found.
+
+Additionally, we can find the correct percentage drops for Chicago, Boston, and St. Louis in the created frame as in the following quote: 
+
+  "In Chicago, the homicide arrest rate has dropped 21 percentage points, in        Boston it has dropped 12 points and in St. Louis it is down 9."
+
+```{r}
+
+diff_14_17 |>
+  filter(
+    percent_difference < 0
+  ) |>
+  nrow()
+
+```
+
+*4* Reproducible #4:
+
+"For most of the decade before 2015, Baltimore’s annual homicide arrest rate hovered at about 40 percent. Since 2015, the arrest rate hasn’t topped 30 percent in any year. And while most cities saw their arrest rates drop gradually, Baltimore’s decline was sudden — plummeting 15 percentage points in 2015, after Gray’s death, the largest single-year drop for any city already solving less than half its homicides."
+ 
+- Before 2015: rate at about 40%
+- Since 2015: rate has not topped 30 percent any year
+- Baltimore's drop was sudden: 15% points in 2015
+  - largest single-year drop
+  
+*4.1* Before 2015: rate at 40%
+
+Can observe below that the arrest rate before 2015 was either right below, at or over 40%. It can also be proven that the mean of the arrest rate was 41% before 2015.
+
+```{r}
+#already created Bmore percent arrests over years
+baltimore_percent_arrest
+
+baltimore_percent_arrest |>
+  filter(
+    year < 2015
+  ) |>
+  summarise(
+    mean_percent = mean(percentage)
+  )
+```
+
+*4.2* Since 2015: rate has not topped 30 percent any year
+
+The below code shows all the arrest rates for 2015 and on, all of which did not surpas 28% or just 30%.
+
+```{r}
+#2015 onwards
+baltimore_percent_arrest |>
+  filter(
+    year >= 2015
+  )
+```
+
+*4.3* Baltimore's drop was sudden: 15% points in 2015 
+
+Below shows that the drop to 2015 was 15% points.
+
+```{r}
+
+baltimore_percent_arrest |>
+  filter(
+    year == 2014 |
+    year == 2015
+  ) |>
+  summarise(
+    difference = diff(percentage)
+  )
+
+```
+
+*4.4* 2015 was the largest single-year drop
+
+The below code calculates the difference in arrest rates since 2012. The largest single-year drop was between 2014 and 2015 where it dropped 15% points. All other rates increased or decreased no more than 5%.
+
+```{r}
+
+baltimore_percent_arrest |>
+  mutate(
+    difference = c(NA, diff(percentage))
+  )
+
+```
+
+*5* Reproducible #5:
+
+"Community leaders and residents say that leaves hundreds of families who have been robbed of a loved one without a chance at seeing justice done. Of the 1,002 homicides between 2015 and the beginning of this year, just 252 — one out of every four — resulted in an arrest."
+
+- 1,002 homicides between 2015-2017 in Bmore
+- 252 - 1/4 - resulted in an arrest
+
+*5.1* 1,002 homicides between 2015-2017 in Bmore
+
+Below the code shows that there was 1,002 homicides between 2015-2017
+
+```{r}
+
+bmore_cleaned_homicide_data <- cleaned_homicide_data |>
+  filter(
+    city == "Baltimore"
+  )
+
+bmore_cleaned_homicide_data |>
+  filter(
+    year == 2015 |
+    year == 2016 |
+    year == 2017
+  ) |>
+  summarise(
+    total = n()
+  )
+
+```
+
+*5.2* 252 - 1/4 - resulted in an arrest.
+
+The below codes get the number of homicides that resulted in an arrest.
+
+```{r}
+
+bmore_homicides_15_to_17 <- bmore_cleaned_homicide_data |>
+  filter(
+    year == 2015 |
+    year == 2016 |
+    year == 2017
+  )
+
+bmore_homicides_15_to_17 |>
+  filter(
+    disposition == "Closed by arrest"
+  ) |>
+  summarise(
+    total = n()
+  )
 
 ```
 
