@@ -1,0 +1,168 @@
+---
+title: "demo"
+output: html_document
+---
+
+Reproducible:
+
+"Of 50 of the nation’s largest cities, *Baltimore is one of 34 where police now make homicide arrests less often than in 2014*, according to a Washington Post analysis."
+
+*!Steps Before analysis!*
+
+```{r Libraries}
+
+#install.packages("tidyverse") 
+#install.packages("lubridate")
+  #uncomment if packages not installed
+
+library(tidyverse)
+library(lubridate)
+
+```
+
+```{r Load data}
+
+#data provided by The Washington Post's github
+  #link: https://github.com/washingtonpost/data-homicides
+homicide_data <- read_csv("homicide-data.csv")
+
+```
+
+```{r Cleaning Dates}
+#Need to clean reported_date col first
+  #Right now it looks like: <dbl> 20100504 for 2010-05-04
+
+cleaned_homicide_data <- homicide_data |>
+  mutate(cleaned_reported_date = ymd(reported_date)) |> #got an error: 2 failed to parse
+  mutate(year = year(cleaned_reported_date)) #creating year col for later
+
+head(cleaned_homicide_data) #checking df
+```
+
+*1* "Baltimore is one of 34 where police now make homicide arrests less often than in 2014" 
+
+First step is getting the *total number of dispositions by city and year.*
+
+```{r}
+
+all_total_dispositions <- cleaned_homicide_data |>
+  group_by(city, year) |>
+  summarise(
+    total_dispositions = n() #getting totals
+  ) |>
+  arrange(desc(year)) #arranging from 2017 to smallest date
+
+#all_total_dispositions
+  #uncomment to see data frame created
+
+```
+
+*2* Now that we know how many dispositions were made in each city by year we need to find . . . *all homicides closed by arrests by city and year* to the percent of homicide cases are closed by arrests. 
+
+```{r}
+
+all_closed_by_arrest <- cleaned_homicide_data |>
+  filter(disposition == "Closed by arrest") |> 
+    #filtering by Closed by arrest
+  group_by(city, year) |>
+  summarise(
+    total_closed_by_arrests = n() #getting totals
+  )
+
+#all_closed_by_arrest #uncomment to show data frame
+
+```
+
+*3* Now we have two data frames we want to then . . .  *combine the two data frames by city and year* in a >left join< while *calculating the percentage of closed by arrest* for that year.
+
+```{r}
+
+combo_dispo_and_arrest <- left_join(all_total_dispositions, all_closed_by_arrest, by = c("city", "year"), keep = TRUE) |>
+  #^ left join by equal city and year values
+  #keep = TRUE ensures all data is kept
+  mutate(
+    year = year.x,
+    city = city.x
+  ) |> #cleaning column names
+  select(-year.x, -year.y, -city.x, -city.y) |> #removing icky names
+  mutate(
+    total_dispositions = ifelse(is.na(total_dispositions),
+                                0, total_dispositions), 
+    #making na rows equal to 0 so future calculations do not break            everything
+    total_closed_by_arrests = ifelse(is.na(total_closed_by_arrests),
+                                     0, total_closed_by_arrests),
+    #making NA rows equal to 0 so future cals do not break everything
+    percentage = (total_closed_by_arrests / total_dispositions) * 100
+    #calculating percent closed by arrest
+    ) |>
+  arrange(desc(city))
+
+#combo_dispo_and_arrest #uncomment to see data frame
+
+```
+
+*4* Great! We have all of the cases closed by arrest for each major city in the U.S. now we need to . . . *isolating 2014 and 2017 from the rest of the data frames* to compare arrest rates.
+
+I found it was easier to make two separate frames with separate year columns to create a difference column to determine whether a cities 2014 arrest rate increased or decreased compared to 2017.
+
+```{r}
+percent_14 <- combo_dispo_and_arrest |>
+  filter(year == 2014)
+
+percent_14
+
+percent_17 <- combo_dispo_and_arrest |>
+  filter(year == 2017)
+
+percent_17
+```
+
+*5* Now we need to join the two data frames by city and create a new column finding the difference between 2017 and 2014.
+
+what we want: 
+  difference == 2017_% - 2014_%
+
+what we have: 
+  percent_difference = percentage.y [2017] - percentage.x [2014]
+
+
+```{r}
+
+diff_14_17 <- left_join(percent_14, percent_17, by = "city", keep = TRUE) |>
+  mutate(percent_difference = percentage.y - percentage.x,
+         #calculating difference
+         city = city.x,
+         `2014_percent_arrested` = percentage.x,
+         `2017_percent_arrested` = percentage.y) |> #cleaning names 
+  select(-year.x, -year.y, -city.x, -city.y, -percentage.x, -percentage.y, -total_dispositions.x, -total_dispositions.y, -total_closed_by_arrests.x, -total_closed_by_arrests.y ) #dropping unused/unnecessary names for readability
+
+#diff_14_17 #uncomment to see data frame
+```
+
+*6* Now we have the difference between arrest rates! Which cities had a decline and which had an increase in arrest rates?
+
+To find cities with a drop in arrest rates for homicides we need to find which cities have a *negative* difference between 2017 and 2014.
+
+Take this example:
+
+<numbers made up>
+Baltimore arrest rate in 2014 = 50
+Baltimore arrest rate in 2017 = 27
+
+2017 rate - 2014 rate = rate difference
+
+27% - 50% = -23% difference
+
+Thus, *any negative percent differences indicates a decline in arrest rates between 2014 and 2017 in that city.*
+
+The below count reads back 35 cites instead of the quotes 34 because Durham was counted as having a loss of 63% of arrest rates. Durham can be taken out since there was no rate for city in 2017, therefore the total number of cities that experienced a drop in arrest rates was 34, just like what the WP found.
+
+```{r}
+
+diff_14_17 |>
+  filter(
+    percent_difference < 0
+  ) |>
+  nrow()
+
+```

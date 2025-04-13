@@ -199,7 +199,7 @@ The below count reads back 35 cites instead of the quotes 34 because Durham was 
 
 Additionally, we can find the correct percentage drops for Chicago, Boston, and St. Louis in the created frame as in the following quote: 
 
-  "In Chicago, the homicide arrest rate has dropped 21 percentage points, in        Boston it has dropped 12 points and in St. Louis it is down 9."
+  "In Chicago, the homicide arrest rate has dropped 21 percentage points, in Boston it has dropped 12 points and in St. Louis it is down 9."
 
 ```{r}
 
